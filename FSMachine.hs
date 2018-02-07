@@ -14,8 +14,8 @@ data Transition = Trans
 
 data FSMachine = FSM
     { states :: [TState]
-    -- , alphabet :: [TSymbol]
+    , alphabet :: [TSymbol]
     , transitions :: [Transition]
     , startState :: TState
-    , endStates :: String
+    , endStates :: [TState]
     } deriving (Eq)

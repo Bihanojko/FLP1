@@ -14,35 +14,31 @@ main = do
     args <- getArgs
     let (process, filename) = parseArgs args
     inputContent <- getInput filename
-    let (fSMachine) = parseContent (lines inputContent)
+    let fSMachine = parseContent (lines inputContent)
 
     -- print process
     -- print filename
     -- print inputContent
     -- printFSMachine fSMachine
 
-    print (computeKIndistinguishability fSMachine 2)
-
-    -- if process then minimalizeFSM fSMachine
-    -- else printFSMachine fSMachine
-
-    return ()
+    if process then minimalizeFSM fSMachine
+    else printFSMachine fSMachine
 
 
 
 printFSMachine :: FSMachine -> IO ()
 printFSMachine fsm = do
     putStrLn (concat (intersperse "," (states fsm)))
-    -- putStrLn (alphabet fsm)
+    putStrLn (alphabet fsm)
     putStrLn (startState fsm)
-    putStrLn (endStates fsm)
+    putStrLn (concat (intersperse "," (endStates fsm)))    
     mapM_ printTransition (transitions fsm)
 
 
 
 printTransition :: Transition -> IO ()
-printTransition transition = do
-    putStrLn $ fromState transition ++ "," ++ [(withSymbol transition)] ++ "," ++ (toState transition)   
+printTransition transition =
+    putStrLn $ fromState transition ++ "," ++ [withSymbol transition] ++ "," ++ toState transition
 
 
 
@@ -62,41 +58,60 @@ parseArgs _ = error "Error in input arguments. Usage: ./dka-2-mka [-i|-t] [filen
 
 getInput :: String -> IO String
 getInput filename
-    | filename == "None" = do
-        content <- hGetContents stdin
-        return content
+    | filename == "None" =
+        getContents
     | otherwise = do
         correctFilename <- doesFileExist filename
         if correctFilename
-            then do 
-                content <- readFile filename
-                return content
+            then
+                readFile filename
             else error "The input file does not exist!"
 
 
 
 parseContent :: [String] -> FSMachine
-parseContent (states:startState:finalStates:transitions) =
+parseContent (states : startState : finalStates : transitions) =
     if null transitions
         then error "no transitions"
-        else FSM getStates (map getRule transitions) startState finalStates
-        -- else FSM getStates getAlph (map getRule transitions) startState finalStates
+        else FSM getStates (getAlph transitions) (map getRule transitions) startState getFinalStates
+        -- else FSM getStates (map getRule transitions) (read startState :: Int) getFinalStates
     where
         getStates = splitOn "," states
-        -- getAlph = "we do not really care for alphabet"
+        -- getStates = map (read :: String -> Int) (splitOn "," states)
+        getAlph transitions = nub (map getSymbol transitions)
+        getSymbol transition = head (splitOn "," transition !! 1)
         getRule rule = getRule2 (splitOn "," rule)
         getRule2 :: [String] -> Transition
         getRule2 [q1, [sym], q2] =
+        -- Trans (read q1 :: Int) sym (read q2 :: Int)
             Trans q1 sym q2
         getRule2 _ = error "bad transition syntax"
+        getFinalStates = splitOn "," finalStates
+        -- getFinalStates = map (read :: String -> Int) (splitOn "," finalStates)
 parseContent _ = error "bad syntax"
 
 
 
--- minimalizeFSM :: FSMachine -> Int
--- minimalizeFSM fSMachine =
---     computeKIndistinguishability 0 1
+minimalizeFSM :: FSMachine -> IO ()
+minimalizeFSM fSMachine = do
+    let prevIndistinguishability = compute0Indistinguishability (states fSMachine) (endStates fSMachine)
+    let nextIndistinguishability = computeKIndistinguishability (transitions fSMachine) prevIndistinguishability
+    print prevIndistinguishability
+    print nextIndistinguishability
 
 
-computeKIndistinguishability :: FSMachine -> Int -> Int
-computeKIndistinguishability fSMachine k = k
+
+compute0Indistinguishability :: [TState] -> [TState] -> [[TState]]
+compute0Indistinguishability states endStates = endStates : [states \\ endStates]
+
+
+
+computeKIndistinguishability :: [Transition] -> [[TState]] -> [[TState]]
+computeKIndistinguishability transitions prevInd = do
+    let x = map todo prevInd
+    x
+
+todo :: [TState] -> [TState]
+todo listStates = listStates
+
+-- TODO zuplnit KA pred minimalizaci, check vstup, zda je validni
