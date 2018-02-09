@@ -80,8 +80,7 @@ parseContent (states : startState : finalStates : transitions) =
         getAlph transitions = nub (map getSymbol transitions)
         getSymbol transition = head (splitOn "," transition !! 1)
         getRule rule = getRule2 (splitOn "," rule)
-        getRule2 [q1, [sym], q2] =
-            Trans q1 sym q2
+        getRule2 [q1, [sym], q2] = Trans q1 sym q2
         getRule2 _ = error "bad transition syntax"
 parseContent _ = error "bad syntax"
 
@@ -90,10 +89,17 @@ parseContent _ = error "bad syntax"
 minimalizeFSM :: FSMachine -> IO ()
 minimalizeFSM fSMachine = do
     let completeFSM = getCompleteFSM fSMachine
-    let prevIndistinguishability = compute0Indistinguishability (states completeFSM) (endStates completeFSM)
-    let nextIndistinguishability = computeKIndistinguishability (transitions completeFSM) prevIndistinguishability
-    print prevIndistinguishability
-    print nextIndistinguishability
+    let prevInd = compute0Indistinguishability (states completeFSM) (endStates completeFSM)
+    -- let nextIndistinguishability = computeKIndistinguishability completeFSM prevInd
+    print prevInd
+    -- print nextIndistinguishability
+    let xxx = [getEndStates x fSMachine prevInd | x <- prevInd]
+    print xxx
+    where
+        getEndStates oneGroup fSMachine prevInd = [getEndStates2 oneGroup x fSMachine prevInd | x <- (alphabet fSMachine)]
+        getEndStates2 oneGroup symbol fSMachine prevInd = [getEndState x symbol fSMachine prevInd | x <- oneGroup]
+        getEndState state symbol fSMachine prevInd = head [getGroup (toState x) prevInd | x <- (transitions fSMachine), (fromState x) == state, (withSymbol x) == symbol]
+        getGroup state prevInd = head [x | x <- [0, length prevInd - 1], state `elem` prevInd !! x]
 
 
 getCompleteFSM :: FSMachine -> FSMachine
@@ -138,9 +144,21 @@ compute0Indistinguishability states endStates = endStates : [states \\ endStates
 
 
 -- TODO
-computeKIndistinguishability :: [Transition] -> [[TState]] -> [[TState]]
-computeKIndistinguishability transitions prevInd =
-    -- let xxx = [todo x | x <- prevInd]
-    prevInd
+-- computeKIndistinguishability :: FSMachine -> [[TState]] -> [[TState]]
+-- computeKIndistinguishability fSMachine prevInd = do
+--     let xxx = [todo x (alphabet fSMachine) | x <- prevInd]
+--     xxx
+--     where
+--         todo oneGroup alphabet = [todo2 x alphabet | x <- oneGroup]
+--         todo2 state alphabet = [state ++ [x] | x <- alphabet]
+--         -- todo2 oneGroup withSymbol = [x ++ [withSymbol] | x <- oneGroup]        
+--     -- [todo x (alphabet fSMachine) | x <- prevInd]
+--     -- [todo x y | x <- prevInd, y <- (alphabet fSMachine)]
+--     -- prevInd
+
+-- -- todo :: [[TState]] -> TSymbol -> [[TState]]
+-- -- -- todo :: [TState] -> [TSymbol] -> [TState]
+-- -- todo prevInd withSymbol = [x ++ [withSymbol] | x <- prevInd]
+-- -- -- todo oneGroup alphabet = [x ++ [y] | x <- oneGroup, y <- alphabet]
 
 -- TODO remove unused functions and imports
