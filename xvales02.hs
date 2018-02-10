@@ -24,10 +24,10 @@ main = do
 
 printFSMachine :: FSMachine -> IO ()
 printFSMachine fsm = do
-    putStrLn (concat (intersperse "," (states fsm)))
+    putStrLn (intercalate "," (states fsm))
     -- putStrLn (alphabet fsm)
     putStrLn (startState fsm)
-    putStrLn (concat (intersperse "," (endStates fsm)))   
+    putStrLn (intercalate "," (endStates fsm))   
     mapM_ printTransition (transitions fsm)
 
 
@@ -94,27 +94,26 @@ minimalizeFSM fSMachine = do
             if prevInd /= nextInd then computeNewKInd fSMachine nextInd
             else nextInd
         reduceFSM fSMachine result = fSMachine {
-            states = sort [head (sort x) | x <- result],
-            transitions = sortOn fromState $ sortOn withSymbol $ nub $ [renameStates x result | x <- (transitions fSMachine)],
-            startState = [(getHead (sort x)) !! 0 | x <- result, (startState fSMachine) `elem` x],
-            endStates = sort $ nub $ [getHead (sort x) | x <- result, y <- endStates fSMachine, y `elem` x]
+            states = sort [minimum x | x <- result],
+            transitions = sortOn fromState $ sortOn withSymbol $ nub [renameStates x result | x <- transitions fSMachine],
+            startState = [head (getHead (sort x)) | x <- result, startState fSMachine `elem` x],
+            endStates = sort $ nub [getHead (sort x) | x <- result, y <- endStates fSMachine, y `elem` x]
         }
         renameStates transition result = transition {
-            fromState = [(getHead (sort x)) !! 0 | x <- result, (fromState transition) `elem` x],
-            toState = [(getHead (sort x)) !! 0 | x <- result, (toState transition) `elem` x]
+            fromState = [head (getHead (sort x)) | x <- result, fromState transition `elem` x],
+            toState = [head (getHead (sort x)) | x <- result, toState transition `elem` x]
         }
 
 
 getCompleteFSM :: FSMachine -> FSMachine
-getCompleteFSM fSMachine = do
-    if (isFSMComplete fSMachine) then fSMachine
+getCompleteFSM fSMachine =
+    if isFSMComplete fSMachine then fSMachine
     else completeFSM fSMachine
 
 
 isFSMComplete :: FSMachine -> Bool
 isFSMComplete fSMachine =
-    if length (transitions fSMachine) == (allTransitionsCount fSMachine) then True
-    else False
+    length (transitions fSMachine) == allTransitionsCount fSMachine
     where 
         allTransitionsCount fSMachine = length (states fSMachine) * length (alphabet fSMachine)
 
@@ -124,7 +123,7 @@ completeFSM fSMachine = do
     let sinkState = getSink (states fSMachine)
     let missingTransitions = getMissingTransitions fSMachine sinkState
     let newTransitions = [Trans x y sinkState | (x, y) <- missingTransitions]
-    updateFSM fSMachine (sinkState : states fSMachine) ((transitions fSMachine) ++ newTransitions)
+    updateFSM fSMachine (sinkState : states fSMachine) (transitions fSMachine ++ newTransitions)
     where
         updateFSM x allStates allTrans = x {states = sort allStates, transitions = allTrans}
 
@@ -149,11 +148,11 @@ compute0Indistinguishability states endStates = endStates : [states \\ endStates
 computeKIndistinguishability :: FSMachine -> [[TState]] -> [[TState]]
 computeKIndistinguishability fSMachine prevInd = do
     let endStateTable = [getEndStates x fSMachine prevInd | x <- prevInd]
-    nub $ [x !! idx | x <- map splitGroup endStateTable, idx <- [0..length x - 1]]
+    nub [x !! idx | x <- map splitGroup endStateTable, idx <- [0..length x - 1]]
     where
         getEndStates oneGroup fSMachine prevInd = [getEndStates2 x fSMachine prevInd | x <- oneGroup]
-        getEndStates2 state fSMachine prevInd = (state, [getEndState state x fSMachine prevInd | x <- (alphabet fSMachine)])
-        getEndState state symbol fSMachine prevInd = getHead [getGroup (toState x) prevInd | x <- (transitions fSMachine), (fromState x) == state, (withSymbol x) == symbol]
+        getEndStates2 state fSMachine prevInd = (state, [getEndState state x fSMachine prevInd | x <- alphabet fSMachine])
+        getEndState state symbol fSMachine prevInd = getHead [getGroup (toState x) prevInd | x <- transitions fSMachine, fromState x == state, withSymbol x == symbol]
         getGroup state prevInd = [x | x <- [0..length prevInd - 1], state `elem` prevInd !! x]
 
         splitGroup targets = map (getOneGroup targets) (nub [y | (x, y) <- targets])
@@ -164,3 +163,4 @@ getHead (x:xs) = x
 getHead [] = []
 
 -- TODO remove unused imports, split lines longer than 100 chars
+-- TODO README, okomentovat, testy a skript taky prilozit a popsat v README
