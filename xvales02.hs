@@ -1,8 +1,8 @@
 import System.Environment
 import Data.List
-import System.IO
-import System.IO.Error
-import System.Exit
+-- import System.IO
+-- import System.IO.Error
+-- import System.Exit
 import System.Directory
 import Data.List.Split
 
@@ -16,12 +16,8 @@ main = do
     inputContent <- getInput filename
     let fSMachine = parseContent (lines inputContent)
 
-    -- print process
-    -- print filename
-    -- print inputContent
-    -- printFSMachine fSMachine
-
-    if process then minimalizeFSM fSMachine
+    -- if process then minimalizeFSM fSMachine
+    if process then printFSMachine $ minimalizeFSM fSMachine
     else printFSMachine fSMachine
 
 
@@ -85,21 +81,28 @@ parseContent (states : startState : finalStates : transitions) =
 parseContent _ = error "bad syntax"
 
 
--- TODO
-minimalizeFSM :: FSMachine -> IO ()
+minimalizeFSM :: FSMachine -> FSMachine
 minimalizeFSM fSMachine = do
     let completeFSM = getCompleteFSM fSMachine
     let prevInd = compute0Indistinguishability (states completeFSM) (endStates completeFSM)
-    -- let nextIndistinguishability = computeKIndistinguishability completeFSM prevInd
-    print prevInd
-    -- print nextIndistinguishability
-    let xxx = [getEndStates x fSMachine prevInd | x <- prevInd]
-    print xxx
+    let result = computeNewKInd completeFSM prevInd
+    -- printFSMachine $ reduceFSM completeFSM result
+    reduceFSM completeFSM result
     where
-        getEndStates oneGroup fSMachine prevInd = [getEndStates2 oneGroup x fSMachine prevInd | x <- (alphabet fSMachine)]
-        getEndStates2 oneGroup symbol fSMachine prevInd = [getEndState x symbol fSMachine prevInd | x <- oneGroup]
-        getEndState state symbol fSMachine prevInd = head [getGroup (toState x) prevInd | x <- (transitions fSMachine), (fromState x) == state, (withSymbol x) == symbol]
-        getGroup state prevInd = head [x | x <- [0, length prevInd - 1], state `elem` prevInd !! x]
+        computeNewKInd fSMachine prevInd = do
+            let nextInd = computeKIndistinguishability fSMachine prevInd
+            if prevInd /= nextInd then computeNewKInd fSMachine nextInd
+            else nextInd
+        reduceFSM fSMachine result = fSMachine {
+            states = sort [head (sort x) | x <- result],
+            transitions = sortOn fromState $ sortOn withSymbol $ nub $ [renameStates x result | x <- (transitions fSMachine)],
+            startState = [(getHead (sort x)) !! 0 | x <- result, (startState fSMachine) `elem` x],
+            endStates = sort $ nub $ [getHead (sort x) | x <- result, y <- endStates fSMachine, y `elem` x]
+        }
+        renameStates transition result = transition {
+            fromState = [(getHead (sort x)) !! 0 | x <- result, (fromState transition) `elem` x],
+            toState = [(getHead (sort x)) !! 0 | x <- result, (toState transition) `elem` x]
+        }
 
 
 getCompleteFSM :: FSMachine -> FSMachine
@@ -118,8 +121,8 @@ isFSMComplete fSMachine =
 
 completeFSM :: FSMachine -> FSMachine
 completeFSM fSMachine = do
-    let missingTransitions = getMissingTransitions fSMachine
     let sinkState = getSink (states fSMachine)
+    let missingTransitions = getMissingTransitions fSMachine sinkState
     let newTransitions = [Trans x y sinkState | (x, y) <- missingTransitions]
     updateFSM fSMachine (sinkState : states fSMachine) ((transitions fSMachine) ++ newTransitions)
     where
@@ -129,12 +132,12 @@ completeFSM fSMachine = do
 getSink :: [TState] -> TState
 getSink states = do
     let statesInt = [read x :: Int | x <- states]
-    show (head ([0..1000] \\ statesInt)) :: TState
+    show (head ([0..length states + 1] \\ statesInt)) :: TState
 
 
-getMissingTransitions :: FSMachine -> [(TState, TSymbol)]
-getMissingTransitions fSMachine = do
-    let allTransitions = [(state, symbol) | state <- states fSMachine, symbol <- alphabet fSMachine]
+getMissingTransitions :: FSMachine -> TState -> [(TState, TSymbol)]
+getMissingTransitions fSMachine sinkState = do
+    let allTransitions = [(state, symbol) | state <- sinkState : states fSMachine, symbol <- alphabet fSMachine]
     let definedTransitions = [(fromState x, withSymbol x) | x <- transitions fSMachine]    
     allTransitions \\ definedTransitions
     
@@ -143,22 +146,21 @@ compute0Indistinguishability :: [TState] -> [TState] -> [[TState]]
 compute0Indistinguishability states endStates = endStates : [states \\ endStates]
 
 
--- TODO
--- computeKIndistinguishability :: FSMachine -> [[TState]] -> [[TState]]
--- computeKIndistinguishability fSMachine prevInd = do
---     let xxx = [todo x (alphabet fSMachine) | x <- prevInd]
---     xxx
---     where
---         todo oneGroup alphabet = [todo2 x alphabet | x <- oneGroup]
---         todo2 state alphabet = [state ++ [x] | x <- alphabet]
---         -- todo2 oneGroup withSymbol = [x ++ [withSymbol] | x <- oneGroup]        
---     -- [todo x (alphabet fSMachine) | x <- prevInd]
---     -- [todo x y | x <- prevInd, y <- (alphabet fSMachine)]
---     -- prevInd
+computeKIndistinguishability :: FSMachine -> [[TState]] -> [[TState]]
+computeKIndistinguishability fSMachine prevInd = do
+    let endStateTable = [getEndStates x fSMachine prevInd | x <- prevInd]
+    nub $ [x !! idx | x <- map splitGroup endStateTable, idx <- [0..length x - 1]]
+    where
+        getEndStates oneGroup fSMachine prevInd = [getEndStates2 x fSMachine prevInd | x <- oneGroup]
+        getEndStates2 state fSMachine prevInd = (state, [getEndState state x fSMachine prevInd | x <- (alphabet fSMachine)])
+        getEndState state symbol fSMachine prevInd = getHead [getGroup (toState x) prevInd | x <- (transitions fSMachine), (fromState x) == state, (withSymbol x) == symbol]
+        getGroup state prevInd = [x | x <- [0..length prevInd - 1], state `elem` prevInd !! x]
 
--- -- todo :: [[TState]] -> TSymbol -> [[TState]]
--- -- -- todo :: [TState] -> [TSymbol] -> [TState]
--- -- todo prevInd withSymbol = [x ++ [withSymbol] | x <- prevInd]
--- -- -- todo oneGroup alphabet = [x ++ [y] | x <- oneGroup, y <- alphabet]
+        splitGroup targets = map (getOneGroup targets) (nub [y | (x, y) <- targets])
+        getOneGroup targets sequence = [x | (x, y) <- targets, y == sequence]
 
--- TODO remove unused functions and imports
+
+getHead (x:xs) = x
+getHead [] = []
+
+-- TODO remove unused imports, split lines longer than 100 chars
