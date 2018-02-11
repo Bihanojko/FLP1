@@ -69,12 +69,13 @@ parseContent :: [String] -> FSMachine
 parseContent (states : startState : finalStates : transitions) =
     if null transitions
         then error "no transitions"
-        else FSM getStates (getAlph transitions) (map getRule transitions) startState getFinalStates
+        else FSM getStates (getAlph transitions) (getTrans transitions) startState getFinalStates
     where
         getStates = splitOn "," states
         getFinalStates = splitOn "," finalStates
-        getAlph transitions = nub (map getSymbol transitions)
+        getAlph transitions = nub [getSymbol x | x <- transitions, length (splitOn "," x) /= 1]
         getSymbol transition = head (splitOn "," transition !! 1)
+        getTrans transitions = [getRule x | x <- transitions, length (splitOn "," x) /= 1]
         getRule rule = getRule2 (splitOn "," rule)
         getRule2 [q1, [sym], q2] = Trans q1 sym q2
         getRule2 _ = error "bad transition syntax"
@@ -96,12 +97,12 @@ minimalizeFSM fSMachine = do
         reduceFSM fSMachine result = fSMachine {
             states = sort [minimum x | x <- result],
             transitions = sortOn fromState $ sortOn withSymbol $ nub [renameStates x result | x <- transitions fSMachine],
-            startState = [head (getHead (sort x)) | x <- result, startState fSMachine `elem` x],
+            startState = getHead [getHead (sort x) | x <- result, startState fSMachine `elem` x],
             endStates = sort $ nub [getHead (sort x) | x <- result, y <- endStates fSMachine, y `elem` x]
         }
         renameStates transition result = transition {
-            fromState = [head (getHead (sort x)) | x <- result, fromState transition `elem` x],
-            toState = [head (getHead (sort x)) | x <- result, toState transition `elem` x]
+            fromState = getHead [getHead (sort x) | x <- result, fromState transition `elem` x],
+            toState = getHead [getHead (sort x) | x <- result, toState transition `elem` x]
         }
 
 
@@ -125,7 +126,8 @@ completeFSM fSMachine = do
     let newTransitions = [Trans x y sinkState | (x, y) <- missingTransitions]
     updateFSM fSMachine (sinkState : states fSMachine) (transitions fSMachine ++ newTransitions)
     where
-        updateFSM x allStates allTrans = x {states = sort allStates, transitions = allTrans}
+        updateFSM x allStates allTrans = x {states = sort allStates, transitions = sorted allTrans}
+        sorted allTrans = sortOn fromState $ sortOn withSymbol allTrans
 
 
 getSink :: [TState] -> TState
@@ -163,4 +165,4 @@ getHead (x:xs) = x
 getHead [] = []
 
 -- TODO remove unused imports, split lines longer than 100 chars
--- TODO README, okomentovat, testy a skript taky prilozit a popsat v README
+-- TODO README, okomentovat, testy a skript taky prilozit a popsat v README, otestovat na merlinovi
