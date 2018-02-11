@@ -1,0 +1,14 @@
+dka-2-mka
+Funkcionalni a logicke programovani
+Nikola Valesova, xvales02
+
+Program prevadi deterministicky KA bez nedostupnych stavu na minimalni KA. 
+Ocekava na vstupu validni DKA, ktery v pripade, ze vstupni automat neni uplny, 
+jej nejprve prevede na uplny, a pote provede minimalizaci pomoci algoritmu 
+predstaveneho v predmetu TIN, ktery je vybudovan nad urcovanim k-nerozlisitelnosti.
+
+Pro nazev pridaneho stavu pri zuplnovani automatu (tzv. sink stavu) je zvoleno
+prvni volne cislo v posloupnosti 0, 1, 2, ... Sloucene stavy jsou vzdy oznaceny
+podle lexikograficky nejmensiho prvku z dane skupiny.
+
+TODO Testovani  
