@@ -4,13 +4,16 @@
 
 import System.Environment
 import Data.List
-import System.IO
-import System.IO.Error
-import System.Exit
 import System.Directory
 import Data.List.Split
 
 import FSMachine
+
+
+-- error message printed when given arguments are not valid
+errorMessageArgs = "Error in input arguments. Usage: ./dka-2-mka [-i|-t] [filename]" :: String
+-- error message printed when a bad syntax in transitions is found
+errorMessageSyntax = "Error in parsing input file due to bad syntax" :: String
 
 
 -- MAIN
@@ -51,12 +54,12 @@ parseArgs :: [String] -> (Bool, String)
 parseArgs [x]
     | x == "-i" = (False, "None")
     | x == "-t" = (True, "None")
-    | otherwise = error "Error in input arguments. Usage: ./dka-2-mka [-i|-t] [filename]"
+    | otherwise = error errorMessageArgs
 parseArgs [x, y]
     | x == "-i" = (False, y)
     | x == "-t" = (True, y)
-    | otherwise = error "Error in input arguments. Usage: ./dka-2-mka [-i|-t] [filename]"
-parseArgs _ = error "Error in input arguments. Usage: ./dka-2-mka [-i|-t] [filename]"
+    | otherwise = error errorMessageArgs
+parseArgs _ = error errorMessageArgs
 
 
 -- get input content from given file or stdin
@@ -73,42 +76,58 @@ getInput filename
 
 
 -- parse input file and return a filled FSMachine instance
--- TODO
 parseContent :: [String] -> FSMachine
 parseContent (states : startState : finalStates : transitions) =
     FSM getStates getAlph getTrans startState getFinalStates
     where
         getStates = splitOn "," states
         getFinalStates = splitOn "," finalStates
+        -- create unique list of symbols used in rules
         getAlph = nub [getSymbol x | x <- transitions, length (splitOn "," x) /= 1]
         getSymbol transition = head (splitOn "," transition !! 1)
+        -- get list of transitions
         getTrans = [getRule x | x <- transitions, length (splitOn "," x) /= 1]
         getRule rule = getRule2 (splitOn "," rule)
         getRule2 [q1, [sym], q2] = Trans q1 sym q2
-        getRule2 _ = error "bad transition syntax"
-parseContent _ = error "bad syntax"
+        getRule2 _ = error errorMessageSyntax
+parseContent _ = error errorMessageSyntax
 
 
--- TODO
+-- make FSMachine complete and then minimalized
 minimalizeFSM :: FSMachine -> FSMachine
 minimalizeFSM fSMachine = do
+    -- get complete FSMachine
     let completeFSM = getCompleteFSM fSMachine
+    -- compute 0-indistinguishability
     let prevInd = compute0Indistinguishability (states completeFSM) (endStates completeFSM)
+    -- compute final k-indistinguishability
     let result = computeNewKInd completeFSM prevInd
-    -- printFSMachine $ reduceFSM completeFSM result
+    -- reduce input FSMachine according to final indistinguishability relation
     reduceFSM completeFSM result
     where
+        -- while k+1-indistinguishability is different from k-indistinguishability, 
+        -- compute next indistinguishability relation
         computeNewKInd fSMachine prevInd = do
             let nextInd = computeKIndistinguishability fSMachine prevInd
             if prevInd /= nextInd then computeNewKInd fSMachine nextInd
             else nextInd
-        reduceFSM fSMachine result = fSMachine {
-            states = sort [minimum x | x <- result],
-            transitions = sorted $ nub [renameStates x result | x <- transitions fSMachine],
-            startState = getHead [minimum x | x <- result, startState fSMachine `elem` x],
-            endStates = sort(nub [minimum x | x <- result, y <- endStates fSMachine, y `elem` x])
-        }
-        renameStates transition result = transition {
+
+
+-- minimalize FSMachine according to final indistinguishability relation
+reduceFSM :: FSMachine -> [[TState]] -> FSMachine
+reduceFSM fSMachine result = fSMachine {
+        -- set states as the lowest member from each group
+        states = sort [minimum x | x <- result],
+        -- set transitions as unique list of renamed original transitions        
+        transitions = sorted $ nub [renameStates x | x <- transitions fSMachine],
+        -- set start state as the lowest member from the group that contains original start state        
+        startState = getHead [minimum x | x <- result, startState fSMachine `elem` x],
+        -- set end states as the lowest member from each group containing any of original end states
+        endStates = sort(nub [minimum x | x <- result, y <- endStates fSMachine, y `elem` x])
+    }
+    where
+        -- rename origin and goal states of given transition
+        renameStates transition = transition {
             fromState = getHead [getHead (sort x) | x <- result, fromState transition `elem` x],
             toState = getHead [getHead (sort x) | x <- result, toState transition `elem` x]
         }
@@ -137,9 +156,13 @@ isFSMComplete fSMachine =
 -- transform a not fully defined FSM to a fully defined one
 completeFSM :: FSMachine -> FSMachine
 completeFSM fSMachine = do
+    -- get name for sink state
     let sinkState = getSink (states fSMachine)
+    -- get list of missing transitions (fromState, withSymbol)
     let missingTransitions = getMissingTransitions fSMachine sinkState
+    -- create a list of transitions that were missing with toState == sinkState
     let newTransitions = [Trans x y sinkState | (x, y) <- missingTransitions]
+    -- add sink state and new transitions to FSMachine
     updateFSM fSMachine (sinkState : states fSMachine) (transitions fSMachine ++ newTransitions)
     where
         updateFSM x allStates allTrans = x {states = sort allStates, transitions = sorted allTrans}
@@ -167,10 +190,12 @@ compute0Indistinguishability states endStates = [x | x <- getGroups, x /= [""]]
         getGroups = endStates : [states \\ endStates]
 
 
--- TODO
+-- compute (k+1)-indistinguishability from k-indistinguishability (prevInd)
 computeKIndistinguishability :: FSMachine -> [[TState]] -> [[TState]]
 computeKIndistinguishability fSM prevInd = do
+    -- TODO
     let endStateTable = [getEndStates x | x <- prevInd]
+    -- TODO
     nub [x !! idx | x <- map splitGroup endStateTable, idx <- [0..length x - 1]]
     where
         getEndStates oneGroup = [getEndStates2 x fSM prevInd | x <- oneGroup]
@@ -186,5 +211,4 @@ computeKIndistinguishability fSM prevInd = do
 getHead (x:xs) = x
 getHead [] = []
 
--- TODO okomentovat
 -- TODO prilozit testy a skript, popsat v README
