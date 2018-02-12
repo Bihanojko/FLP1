@@ -13,19 +13,23 @@ import Data.List.Split
 import FSMachine
 
 
+-- MAIN
 main :: IO ()
 main = do
+    -- get arguments and process them
     args <- getArgs
     let (process, filename) = parseArgs args
+    -- get input content and process it
     inputContent <- getInput filename
     let fSMachine = parseContent (lines inputContent)
 
-    -- if process then minimalizeFSM fSMachine
+    -- if minimalization is set, then minimalize FSM and output it
     if process then printFSMachine $ minimalizeFSM fSMachine
+    -- else output FSMachine from its inner representation
     else printFSMachine fSMachine
 
 
-
+-- print FSMachine according to given format
 printFSMachine :: FSMachine -> IO ()
 printFSMachine fsm = do
     putStrLn (intercalate "," (states fsm))
@@ -34,16 +38,16 @@ printFSMachine fsm = do
     putStrLn (intercalate "," (endStates fsm))   
     mapM_ printTransition (transitions fsm)
 
-
-
+ 
+-- print Transition according to given format
 printTransition :: Transition -> IO ()
 printTransition transition =
     putStrLn $ fromState transition ++ "," ++ [withSymbol transition] ++ "," ++ toState transition
 
 
-
+-- parse given arguments, Bool represents if minimalization should be done, String return filename
+-- or "None" when reading from stdin
 parseArgs :: [String] -> (Bool, String)
-parseArgs [] = error "Error in input arguments. Usage: ./dka-2-mka [-i|-t] [filename]"
 parseArgs [x]
     | x == "-i" = (False, "None")
     | x == "-t" = (True, "None")
@@ -55,37 +59,37 @@ parseArgs [x, y]
 parseArgs _ = error "Error in input arguments. Usage: ./dka-2-mka [-i|-t] [filename]"
 
 
-
+-- get input content from given file or stdin
 getInput :: String -> IO String
 getInput filename
+    -- reading from stdin
     | filename == "None" =
         getContents
+    -- reading from file, test if file exists and get content
     | otherwise = do
         correctFilename <- doesFileExist filename
-        if correctFilename
-            then
-                readFile filename
-            else error "The input file does not exist!"
+        if correctFilename then readFile filename
+        else error "The input file does not exist!"
 
 
-
+-- parse input file and return a filled FSMachine instance
+-- TODO
 parseContent :: [String] -> FSMachine
 parseContent (states : startState : finalStates : transitions) =
-    if null transitions
-        then error "no transitions"
-        else FSM getStates (getAlph transitions) (getTrans transitions) startState getFinalStates
+    FSM getStates getAlph getTrans startState getFinalStates
     where
         getStates = splitOn "," states
         getFinalStates = splitOn "," finalStates
-        getAlph transitions = nub [getSymbol x | x <- transitions, length (splitOn "," x) /= 1]
+        getAlph = nub [getSymbol x | x <- transitions, length (splitOn "," x) /= 1]
         getSymbol transition = head (splitOn "," transition !! 1)
-        getTrans transitions = [getRule x | x <- transitions, length (splitOn "," x) /= 1]
+        getTrans = [getRule x | x <- transitions, length (splitOn "," x) /= 1]
         getRule rule = getRule2 (splitOn "," rule)
         getRule2 [q1, [sym], q2] = Trans q1 sym q2
         getRule2 _ = error "bad transition syntax"
 parseContent _ = error "bad syntax"
 
 
+-- TODO
 minimalizeFSM :: FSMachine -> FSMachine
 minimalizeFSM fSMachine = do
     let completeFSM = getCompleteFSM fSMachine
@@ -110,23 +114,27 @@ minimalizeFSM fSMachine = do
         }
 
 
+-- sort lists of transitions according to symbols and origin states
 sorted :: [Transition] -> [Transition]
 sorted transitions = sortOn fromState $ sortOn withSymbol transitions
 
 
+-- if FSMachine is not complete, return a fully defined FSMachine
 getCompleteFSM :: FSMachine -> FSMachine
 getCompleteFSM fSMachine =
     if isFSMComplete fSMachine then fSMachine
     else completeFSM fSMachine
 
 
+-- test if FSMachine is complete == contains all possible transitions
 isFSMComplete :: FSMachine -> Bool
 isFSMComplete fSMachine =
-    length (transitions fSMachine) == allTransitionsCount fSMachine
+    length (transitions fSMachine) == allTransitionsCount
     where 
-        allTransitionsCount fSMachine = length (states fSMachine) * length (alphabet fSMachine)
+        allTransitionsCount = length (states fSMachine) * length (alphabet fSMachine)
 
 
+-- transform a not fully defined FSM to a fully defined one
 completeFSM :: FSMachine -> FSMachine
 completeFSM fSMachine = do
     let sinkState = getSink (states fSMachine)
@@ -137,29 +145,35 @@ completeFSM fSMachine = do
         updateFSM x allStates allTrans = x {states = sort allStates, transitions = sorted allTrans}
 
 
+-- get name for additional sink state == the lowest number (0, 1, ...) not yet used
 getSink :: [TState] -> TState
 getSink states = do
     let statesInt = [read x :: Int | x <- states]
     show (head ([0..length states + 1] \\ statesInt)) :: TState
 
 
+-- get a list of tuples of missing rules, [(q, a)] from delta(q, a)
 getMissingTransitions :: FSMachine -> TState -> [(TState, TSymbol)]
 getMissingTransitions fSM sinkState = do
     let allT = [(state, symbol) | state <- sinkState : states fSM, symbol <- alphabet fSM]
     let definedT = [(fromState x, withSymbol x) | x <- transitions fSM]    
     allT \\ definedT
-    
 
+
+-- get 0-indistinguishability == split states to accept and non-accept states  
 compute0Indistinguishability :: [TState] -> [TState] -> [[TState]]
-compute0Indistinguishability states endStates = endStates : [states \\ endStates]
+compute0Indistinguishability states endStates = [x | x <- getGroups, x /= [""]]
+    where
+        getGroups = endStates : [states \\ endStates]
 
 
+-- TODO
 computeKIndistinguishability :: FSMachine -> [[TState]] -> [[TState]]
 computeKIndistinguishability fSM prevInd = do
-    let endStateTable = [getEndStates x fSM prevInd | x <- prevInd]
+    let endStateTable = [getEndStates x | x <- prevInd]
     nub [x !! idx | x <- map splitGroup endStateTable, idx <- [0..length x - 1]]
     where
-        getEndStates oneGroup fSM prevInd = [getEndStates2 x fSM prevInd | x <- oneGroup]
+        getEndStates oneGroup = [getEndStates2 x fSM prevInd | x <- oneGroup]
         getEndStates2 q fSM prevI = (q, [endState q x (transitions fSM) prevI | x <- alphabet fSM])
         endState q a trans prevI = getHead [getGroup x prevI | x <- endState2 q a trans]
         endState2 q a trans = [toState x | x <- trans, fromState x == q, withSymbol x == a]
@@ -168,6 +182,7 @@ computeKIndistinguishability fSM prevInd = do
         getOneGroup targets sequence = [x | (x, y) <- targets, y == sequence]
 
 
+-- get first element of a list, return empty list if list is empty
 getHead (x:xs) = x
 getHead [] = []
 
