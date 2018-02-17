@@ -18,9 +18,8 @@ If no filename is specified, the program reads from stdin.
 
 # Testing
 
-The application has been tested on a set of tests, which can be found in subfolder 'Tests',
-with the use of a script dka-2-mka-test.py. To run the tests, execute "make" and then 
-    python3 dka-2-mka-test.py
+The application has been tested on a set of tests, which can be found in subfolder "Tests",
+with the use of a script dka-2-mka-test.py. To run the tests, execute "make test".
 The set of tests and the script have been developed in collaboration with Ondrej Vales 
 (xvales03) and Matej Marusak (xmarus06). My contibution are tests error-test1.in - 
 error-test8.in and test1.in - test20.in and a major part of the testing script.
