@@ -215,9 +215,9 @@ compute0Indistinguishability states endStates = [x | x <- getGroups, x /= [""]]
 -- compute (k+1)-indistinguishability from k-indistinguishability (prevInd)
 computeKIndistinguishability :: FSMachine -> [[TState]] -> [[TState]]
 computeKIndistinguishability fSM prevInd = do
-    -- TODO
+    -- create a "table" of next states after transition execution for every group in prevInd
     let endStateTable = [getEndStates x | x <- prevInd]
-    -- TODO
+    -- split every group in prevInd to smaller groups according to endStateTable
     nub [x !! idx | x <- map splitGroup endStateTable, idx <- [0..length x - 1]]
     where
         getEndStates oneGroup = [getEndStates2 x fSM prevInd | x <- oneGroup]
