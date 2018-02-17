@@ -24,12 +24,32 @@ main = do
     let (process, filename) = parseArgs args
     -- get input content and process it
     inputContent <- getInput filename
-    let fSMachine = parseContent (lines inputContent)
+    let fSMachine = checkFSMachine $ parseContent (lines inputContent)
 
     -- if minimalization is set, then minimalize FSM and output it
     if process then printFSMachine $ minimalizeFSM fSMachine
     -- else output FSMachine from its inner representation
     else printFSMachine fSMachine
+    where
+        -- checks FSMachine for non-defined states
+        checkFSMachine fSMachine = do
+            let results = map (isStateValid (states fSMachine)) (getAllUsedStates fSMachine)
+            if False `elem` results then error "Invalid input file!"
+            else fSMachine
+
+
+-- get a list of all states used in FSMachine (start, end, in transitions)
+getAllUsedStates :: FSMachine -> [TState]
+getAllUsedStates fSMachine = do
+    let fromStates = [fromState x | x <- transitions fSMachine]
+    let toStates = [toState x | x <- transitions fSMachine]
+    filter (/= "") $ nub([startState fSMachine] ++ endStates fSMachine ++ fromStates ++ toStates)
+
+
+-- check if current state is defined in FSMachine states
+isStateValid :: [TState] -> TState -> Bool
+isStateValid allStates state = if state `elem` allStates then True
+                               else False
 
 
 -- print FSMachine according to given format
@@ -78,15 +98,17 @@ getInput filename
 -- parse input file and return a filled FSMachine instance
 parseContent :: [String] -> FSMachine
 parseContent (states : startState : finalStates : transitions) =
-    FSM getStates getAlph getTrans startState getFinalStates
+    FSM getStates getAlph getTrans checkStartState getFinalStates
     where
         getStates = splitOn "," states
+        checkStartState = if (startState == "") then error "Missing start state!"; 
+                          else startState;
         getFinalStates = splitOn "," finalStates
         -- create unique list of symbols used in rules
         getAlph = nub [getSymbol x | x <- transitions, length (splitOn "," x) /= 1]
         getSymbol transition = head (splitOn "," transition !! 1)
         -- get list of transitions
-        getTrans = [getRule x | x <- transitions, length (splitOn "," x) /= 1]
+        getTrans = [getRule x | x <- transitions]
         getRule rule = getRule2 (splitOn "," rule)
         getRule2 [q1, [sym], q2] = Trans q1 sym q2
         getRule2 _ = error errorMessageSyntax
@@ -210,5 +232,3 @@ computeKIndistinguishability fSM prevInd = do
 -- get first element of a list, return empty list if list is empty
 getHead (x:xs) = x
 getHead [] = []
-
--- TODO prilozit testy a skript, popsat v README
