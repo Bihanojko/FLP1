@@ -41,15 +41,13 @@ main = do
 -- get a list of all states used in FSMachine (start, end, in transitions)
 getAllUsedStates :: FSMachine -> [TState]
 getAllUsedStates fSMachine = do
-    let fromStates = [fromState x | x <- transitions fSMachine]
-    let toStates = [toState x | x <- transitions fSMachine]
-    filter (/= "") $ nub([startState fSMachine] ++ endStates fSMachine ++ fromStates ++ toStates)
+    let transitionStates = [f x | x <- transitions fSMachine, f <- [fromState, toState]]
+    filter (/= "") $ nub([startState fSMachine] ++ endStates fSMachine ++ transitionStates)
 
 
 -- check if current state is defined in FSMachine states
 isStateValid :: [TState] -> TState -> Bool
-isStateValid allStates state = if state `elem` allStates then True
-                               else False
+isStateValid = flip elem
 
 
 -- print FSMachine according to given format
@@ -101,7 +99,7 @@ parseContent (states : startState : finalStates : transitions) =
     FSM getStates getAlph getTrans checkStartState getFinalStates
     where
         getStates = splitOn "," states
-        checkStartState = if (startState == "") then error "Missing start state!"; 
+        checkStartState = if startState == "" then error "Missing start state!"; 
                           else startState;
         getFinalStates = splitOn "," finalStates
         -- create unique list of symbols used in rules
@@ -157,7 +155,7 @@ reduceFSM fSMachine result = fSMachine {
 
 -- sort lists of transitions according to symbols and origin states
 sorted :: [Transition] -> [Transition]
-sorted transitions = sortOn fromState $ sortOn withSymbol transitions
+sorted = sortOn fromState . sortOn withSymbol
 
 
 -- if FSMachine is not complete, return a fully defined FSMachine
@@ -230,5 +228,6 @@ computeKIndistinguishability fSM prevInd = do
 
 
 -- get first element of a list, return empty list if list is empty
+getHead :: [[t]] -> [t]
 getHead (x:xs) = x
 getHead [] = []
