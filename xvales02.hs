@@ -32,17 +32,19 @@ main = do
     else printFSMachine fSMachine
     where
         -- checks FSMachine for non-defined states
-        checkFSMachine fSMachine = do
-            let results = map (isStateValid (states fSMachine)) (getAllUsedStates fSMachine)
+        checkFSMachine fSMachine =
             if False `elem` results then error "Invalid input file!"
             else fSMachine
-
+            where
+                results = map (isStateValid (states fSMachine)) (getAllUsedStates fSMachine)
+                
 
 -- get a list of all states used in FSMachine (start, end, in transitions)
 getAllUsedStates :: FSMachine -> [TState]
-getAllUsedStates fSMachine = do
-    let transitionStates = [f x | x <- transitions fSMachine, f <- [fromState, toState]]
+getAllUsedStates fSMachine =
     filter (/= "") $ nub([startState fSMachine] ++ endStates fSMachine ++ transitionStates)
+    where
+        transitionStates = [f x | x <- transitions fSMachine, f <- [fromState, toState]]
 
 
 -- check if current state is defined in FSMachine states
@@ -115,23 +117,24 @@ parseContent _ = error errorMessageSyntax
 
 -- make FSMachine complete and then minimalized
 minimalizeFSM :: FSMachine -> FSMachine
-minimalizeFSM fSMachine = do
-    -- get complete FSMachine
-    let completeFSM = getCompleteFSM fSMachine
-    -- compute 0-indistinguishability
-    let prevInd = compute0Indistinguishability (states completeFSM) (endStates completeFSM)
-    -- compute final k-indistinguishability
-    let result = computeNewKInd completeFSM prevInd
+minimalizeFSM fSMachine =
     -- reduce input FSMachine according to final indistinguishability relation
     reduceFSM completeFSM result
     where
+        -- get complete FSMachine
+        completeFSM = getCompleteFSM fSMachine
+        -- compute 0-indistinguishability
+        prevInd = compute0Indistinguishability (states completeFSM) (endStates completeFSM)
+        -- compute final k-indistinguishability
+        result = computeNewKInd completeFSM prevInd
         -- while k+1-indistinguishability is different from k-indistinguishability, 
         -- compute next indistinguishability relation
-        computeNewKInd fSMachine prevInd = do
-            let nextInd = computeKIndistinguishability fSMachine prevInd
+        computeNewKInd fSMachine prevInd =
             if prevInd /= nextInd then computeNewKInd fSMachine nextInd
             else nextInd
-
+            where
+                nextInd = computeKIndistinguishability fSMachine prevInd
+                
 
 -- minimalize FSMachine according to final indistinguishability relation
 reduceFSM :: FSMachine -> [[TState]] -> FSMachine
@@ -175,33 +178,35 @@ isFSMComplete fSMachine =
 
 -- transform a not fully defined FSM to a fully defined one
 completeFSM :: FSMachine -> FSMachine
-completeFSM fSMachine = do
-    -- get name for sink state
-    let sinkState = getSink (states fSMachine)
-    -- get list of missing transitions (fromState, withSymbol)
-    let missingTransitions = getMissingTransitions fSMachine sinkState
-    -- create a list of transitions that were missing with toState == sinkState
-    let newTransitions = [Trans x y sinkState | (x, y) <- missingTransitions]
+completeFSM fSMachine =
     -- add sink state and new transitions to FSMachine
     updateFSM fSMachine (sinkState : states fSMachine) (transitions fSMachine ++ newTransitions)
     where
+        -- get name for sink state
+        sinkState = getSink (states fSMachine)
+        -- get list of missing transitions (fromState, withSymbol)
+        missingTransitions = getMissingTransitions fSMachine sinkState
+        -- create a list of transitions that were missing with toState == sinkState
+        newTransitions = [Trans x y sinkState | (x, y) <- missingTransitions]
         updateFSM x allStates allTrans = x {states = sort allStates, transitions = sorted allTrans}
 
 
 -- get name for additional sink state == the lowest number (0, 1, ...) not yet used
 getSink :: [TState] -> TState
-getSink states = do
-    let statesInt = [read x :: Int | x <- states]
+getSink states =
     show (head ([0..length states + 1] \\ statesInt)) :: TState
+    where
+        statesInt = [read x :: Int | x <- states]
 
 
 -- get a list of tuples of missing rules, [(q, a)] from delta(q, a)
 getMissingTransitions :: FSMachine -> TState -> [(TState, TSymbol)]
-getMissingTransitions fSM sinkState = do
-    let allT = [(state, symbol) | state <- sinkState : states fSM, symbol <- alphabet fSM]
-    let definedT = [(fromState x, withSymbol x) | x <- transitions fSM]    
+getMissingTransitions fSM sinkState =
     allT \\ definedT
-
+    where
+        allT = [(state, symbol) | state <- sinkState : states fSM, symbol <- alphabet fSM]
+        definedT = [(fromState x, withSymbol x) | x <- transitions fSM]    
+    
 
 -- get 0-indistinguishability == split states to accept and non-accept states  
 compute0Indistinguishability :: [TState] -> [TState] -> [[TState]]
@@ -212,12 +217,12 @@ compute0Indistinguishability states endStates = [x | x <- getGroups, x /= [""]]
 
 -- compute (k+1)-indistinguishability from k-indistinguishability (prevInd)
 computeKIndistinguishability :: FSMachine -> [[TState]] -> [[TState]]
-computeKIndistinguishability fSM prevInd = do
-    -- create a "table" of next states after transition execution for every group in prevInd
-    let endStateTable = [getEndStates x | x <- prevInd]
+computeKIndistinguishability fSM prevInd =
     -- split every group in prevInd to smaller groups according to endStateTable
     nub [x !! idx | x <- map splitGroup endStateTable, idx <- [0..length x - 1]]
     where
+        -- create a "table" of next states after transition execution for every group in prevInd
+        endStateTable = [getEndStates x | x <- prevInd]
         getEndStates oneGroup = [getEndStates2 x fSM prevInd | x <- oneGroup]
         getEndStates2 q fSM prevI = (q, [endState q x (transitions fSM) prevI | x <- alphabet fSM])
         endState q a trans prevI = getHead [getGroup x prevI | x <- endState2 q a trans]
