@@ -13,7 +13,11 @@ the smallest element in relevant group (according to lexicographical order).
 
 To build the application, run "make" or "make ARGS='{parameters}'" for build options 
 specification. Application can be run using the command:
-    ./dka-2-mka [-i|-t] [filename]
+    ./dka-2-mka {-i|-t|-t -i|-i -t} [filename]
+Parameter '-i' transforms the FSM to inner representation and then outputs it in its
+original form. Parameter '-t' denotes minimalization of the FSM and then output of
+the minimal FSM. If run with both parameters ('-i -t' or '-t -i'), the application
+executes both commands in the given order. 
 If no filename is specified, the program reads from stdin.
 
 # Testing

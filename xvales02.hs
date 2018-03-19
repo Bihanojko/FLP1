@@ -21,15 +21,12 @@ main :: IO ()
 main = do
     -- get arguments and process them
     args <- getArgs
-    let (process, filename) = parseArgs args
+    let (param1, param2, filename) = parseArgs args
     -- get input content and process it
     inputContent <- getInput filename
     let fSMachine = checkFSMachine $ parseContent (lines inputContent)
-
-    -- if minimalization is set, then minimalize FSM and output it
-    if process then printFSMachine $ minimalizeFSM fSMachine
-    -- else output FSMachine from its inner representation
-    else printFSMachine fSMachine
+    processParam param1 fSMachine
+    processParam param2 fSMachine
     where
         -- checks FSMachine for non-defined states
         checkFSMachine fSMachine =
@@ -37,7 +34,14 @@ main = do
             else fSMachine
             where
                 results = map (isStateValid (states fSMachine)) (getAllUsedStates fSMachine)
-                
+        processParam param fSMachine
+            -- if minimalization is not set, output FSMachine from its inner representation
+            | param == "i" = printFSMachine fSMachine
+            -- else minimalize FSM and output it
+            | param == "t" = printFSMachine $ minimalizeFSM fSMachine
+            -- param is "None", meaning that parameter was not set
+            | otherwise = return ()
+      
 
 -- get a list of all states used in FSMachine (start, end, in transitions)
 getAllUsedStates :: FSMachine -> [TState]
@@ -68,16 +72,22 @@ printTransition transition =
     putStrLn $ fromState transition ++ "," ++ [withSymbol transition] ++ "," ++ toState transition
 
 
--- parse given arguments, Bool represents if minimalization should be done, String return filename
--- or "None" when reading from stdin
-parseArgs :: [String] -> (Bool, String)
+-- parse given arguments, first two return values represent given options and their order and
+-- the last return value contains filename or "None" when reading from stdin
+parseArgs :: [String] -> (String, String, String)
 parseArgs [x]
-    | x == "-i" = (False, "None")
-    | x == "-t" = (True, "None")
+    | x == "-i" = ("i", "None", "None")
+    | x == "-t" = ("t", "None", "None")
     | otherwise = error errorMessageArgs
 parseArgs [x, y]
-    | x == "-i" = (False, y)
-    | x == "-t" = (True, y)
+    | x == "-i" && y == "-t" = ("i", "t", "None")
+    | x == "-t" && y == "-i" = ("t", "i", "None")
+    | x == "-i" && y /= "-t" = ("i", "None", y)
+    | x == "-t" && y /= "-i" = ("t", "None", y)
+    | otherwise = error errorMessageArgs
+parseArgs [x, y, z]
+    | x == "-i" && y == "-t" = ("i", "t", z)
+    | x == "-t" && y == "-i" = ("t", "i", z)
     | otherwise = error errorMessageArgs
 parseArgs _ = error errorMessageArgs
 
